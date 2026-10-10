@@ -13,3 +13,13 @@
 /phpunit.xml
 /.phpunit.cache/
 ###< phpunit/phpunit ###
+
+###> apprentissage : réponses aux exercices non versionnées ###
+/src/*
+!/src/Kernel.php
+/tests/*
+!/tests/bootstrap.php
+*.old
+###< apprentissage ###
+
+/.idea/
