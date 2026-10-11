@@ -1,6 +1,6 @@
 # Exercices — Module 15
 
-[Cours](README.md) · [Quiz](quiz.md) · [Méthode](../README.md)
+[Cours](README.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md) · [Méthode](../README.md)
 
 Code à écrire dans `src/HttpClient/`, tests dans `tests/HttpClient/`. Tests de services : `KernelTestCase`. Toutes les réponses proviennent de `MockHttpClient`, sans accès réseau. Écris d'abord les assertions ; les noms des exceptions métier ci-dessous sont des classes à créer.
 
@@ -60,3 +60,38 @@ Crée un service qui produit un rapport pour `[42, 43, 44]` : 42 existe, 43 est 
 - **Critères :** rapport de trois lignes, ordre des identifiants conservé, état explicite pour l'absent, quatre requêtes au total et aucun réseau. Un JSON invalide sur 44 fait échouer le rapport avec une erreur explicite.
 - **Livrable :** tests et une courte explication de l'endroit où tu traduis les exceptions techniques.
 - **Indice :** sépare l'interprétation de l'API de la construction du rapport.
+
+## 9. Autonome — interrompre un export trop volumineux
+
+**Niveau :** avancé · **Durée indicative :** 55 minutes.
+**Prérequis :** exercice 7 et [streaming borné](approfondissement.md) ; `KernelTestCase` et `MockHttpClient`.
+
+Scénario : `BoundedExportClient::download(): string` lit `GET https://catalogue.example/v1/export` avec une limite de 12 octets consommés.
+Ce téléchargement texte est indépendant du JSON des fiches produit ; configure `buffer: false` et ne publie qu'un corps complet.
+Prépare un corps simulé en morceaux `abcd`, `efgh`, `ijkl`, puis une variante avec le morceau supplémentaire `m`.
+Le dépassement doit annuler la réponse et produire l'exception métier `ExportTooLarge`, à créer.
+
+- **Critères :** première fixture → chaîne exacte `abcdefghijkl`, un GET et option de buffering vérifiée ; la taille exactement égale à 12 est autorisée.
+- **Critères :** seconde fixture → `ExportTooLarge`, réponse retournée par le client marquée `canceled`, aucun corps partiel retourné comme succès.
+- **Cas négatif :** une interruption de transport après `abcd` reste une indisponibilité de transport, distincte de `ExportTooLarge` ; aucun résultat incomplet.
+- **Livrable :** tests d'appels réels au service, avec observation de la réponse effectivement consommée ; aucune affirmation de vitesse ou d'octets réellement économisés sur un réseau absent.
+- **Indice 1 :** distingue taille du tampon applicatif et buffering du client ; une limite doit être contrôlée sur chaque morceau de contenu.
+- **Indice 2 :** conserve la réponse renvoyée par `request()` grâce à un petit décorateur de test ; la fixture `MockResponse` fournie au constructeur n'est pas nécessairement cet objet.
+
+## 10. Défi — terminer une pagination et détecter une boucle
+
+**Niveau :** avancé · **Durée indicative :** 60 minutes.
+**Prérequis :** exercices 1–3 ; lecture du [protocole de pagination](approfondissement.md).
+
+Scénario : `PagedCatalogue::all(): array` lit une collection sur deux pages, sans reprises automatiques dans cet atelier.
+La page `/v1/products?page=1` retourne `{"items":[{"id":42,"name":"Carnet"}],"next":"/v1/products?page=2"}`.
+La page 2 retourne `{"items":[{"id":43,"name":"Stylo"}],"next":null}`.
+La base est `https://catalogue.example` ; seuls ces deux chemins exacts sont autorisés et le budget est de deux pages.
+Le service retourne la liste complète dans l'ordre des pages ou lève `InvalidPagination`, classe à créer.
+
+- **Critères :** deux GET dans l'ordre attendu ; résultat exact `[42/Carnet, 43/Stylo]` ; `next: null` ne provoque aucun troisième appel.
+- **Critères :** une page `{"items":[],"next":null}` termine normalement avec une liste vide si c'est la première page.
+- **Cas négatif :** remplace le `next` de la page 2 par celui de la page 1 : `InvalidPagination` après deux appels, sans troisième requête ni liste présentée comme complète.
+- **Cas négatif :** `next` vers `https://autre.example/collect` ou `items` de type chaîne → refus explicite avant d'appeler cette destination ; la factory du mock relève chaque URL.
+- **Indice 1 :** écris le contrat de fin, de forme des pages et de destinations avant la boucle de lecture.
+- **Indice 2 :** une liste de chemins déjà vus détecte un cycle ; un budget de pages borne un parcours sans cycle. Ce sont deux contrôles distincts.

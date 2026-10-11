@@ -1,6 +1,6 @@
 # Exercices — Module 12 : inscription selon le contexte
 
-[Parcours](../README.md) · [Cours](README.md) · [Quiz](quiz.md)
+[Parcours](../README.md) · [Cours](README.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md)
 
 Code : `src/Validation/`, tests : `tests/Validation/`, exécution : `php bin/phpunit tests/Validation`.
 Scénario : DTO d'inscription public, validation uniquement, aucune création de compte ni persistence. HTTP JSON pour le défi final.
@@ -87,3 +87,34 @@ Travail autonome : route en attributs, `MapRequestPayload`, service de validatio
 - Couvrir : brouillon valide via service, publication refusée, cascade, cohérence, aucune donnée enregistrée.
 - Livraison : matrice de cas (donnée, contexte, chemins attendus) et preuve qu'HTTP et service appliquent les mêmes règles de publication.
 - Indice : déclarer `format: 'json'` sur la route et choisir explicitement les groupes du mapping.
+
+## 9. Valider la structure d'une ligne d'import — intermédiaire
+
+Durée indicative : 35–50 min. Prérequis : chemins/codes et [Collection](approfondissement.md).
+Scénario : un service de prévalidation reçoit un tableau PHP déjà lu par son appelant, sans persister de contact.
+Le contrat exige `email` présent, non vide et valide ; `label` est facultatif mais non vide et limité à 12 caractères lorsqu'il existe.
+Les clés supplémentaires sont interdites. Employer le Validator du conteneur, avec une structure `Collection` explicite.
+
+- Réussite : `['email' => 'ada@example.test']` et la variante avec `label => 'Atelier'` → zéro violation.
+- Cas négatifs : `[]` → `[email]` manquant ; email vide → violation de présence de valeur ; label vide → `[label]` ; label de 13 `x` → `[label]` ; clé `admin => true` → `[admin]` inconnue.
+- Preuve : un cas distinct par défaut, assertions sur chemins et codes de contraintes, données d'entrée inchangées après l'appel.
+- Comparaison : une version partielle avec `allowMissingFields: true` accepte `[]`, mais n'accepte pas un email incorrect fourni explicitement.
+- Limite : ajouter un test de valeur racine `null`, expliquer l'acceptation par `Collection` seule, puis rendre le tableau obligatoire dans le contrat du service.
+- Indice 1 : clé absente et clé contenant `null` ou `''` déclenchent des contrôles différents.
+- Indice 2 : examiner `Required`, `Optional`, `MISSING_FIELD_ERROR` et `NO_SUCH_FIELD_ERROR` avant de compter uniquement les messages.
+
+## 10. Un identifiant parmi deux formats avec contrôle tardif — avancé
+
+Durée indicative : 45–65 min. Prérequis : règles de valeur, service instrumenté et [composition de contraintes](approfondissement.md).
+Scénario : l'identifiant de contact est soit un email, soit un code interne exact `MBR-` suivi de quatre chiffres.
+Il est obligatoire et de type chaîne. Une politique locale exécutée ensuite refuse seulement `MBR-0000`.
+La politique n'effectue aucun réseau ; elle enregistre le nombre de consultations pour la fixture courante.
+Composer les règles natives et une vérification finale, sans construire un validateur monolithique qui réimplémente Email.
+
+- Réussite : `ada@example.test` et `MBR-0042` → zéro violation et une consultation de politique chacun.
+- Cas négatifs précoces : `''`, `42` et `'invalid'` → refus, zéro consultation de politique ; figer code et chemin de chaque catégorie.
+- Cas négatif tardif : `MBR-0000` → refus par la politique après exactement une consultation.
+- Preuve : appeler le service avec une fixture fraîche pour chaque valeur ; sur `'invalid'`, observer le code global `AT_LEAST_ONE_OF_ERROR`, sans supposer plusieurs violations de branches.
+- Comparaison : activer puis désactiver `includeInternalMessages` et vérifier que validité/code restent stables même si le message change.
+- Indice 1 : `Email` tolère une chaîne vide ; l'obligation de présence doit protéger toute l'alternative.
+- Indice 2 : `Sequentially` ordonne les étapes, `AtLeastOneOf` choisit entre les deux formes ; la politique ne doit être atteinte qu'après ces deux barrières.

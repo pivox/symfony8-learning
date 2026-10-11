@@ -1,5 +1,7 @@
 # Exercices — Module 10
 
+[Parcours](../README.md) · [Cours](README.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md)
+
 Code dans `src/Components/` (namespace `App\Components`), tests dans `tests/Components/` (namespace `App\Tests\Components`) : `php bin/phpunit tests/Components`. Écris le test d'abord. Pour tout ce qui touche au disque, travaille dans un dossier temporaire (`sys_get_temp_dir()`) nettoyé en `tearDown()`.
 
 ## 1. Service dépendant du temps (Clock)
@@ -35,6 +37,8 @@ Ajoute à une classe `Team` des `addMember()` / `removeMember()` et un `getMembe
 - Question : pourquoi `dumpFile` est-il préférable à `file_put_contents` pour un fichier lu par d'autres processus ?
 
 ## 7. Mime : construire un email
+
+Préparation : suivre la [section Mime du cours](README.md) ; `Address` nécessite `egulias/email-validator`, absent du socle tant qu'il n'a pas été installé seul ou avec Mailer.
 Écris `WelcomeEmailFactory::create(string $to): Email` : expéditeur nommé (`Address`), sujet, corps texte **et** HTML, une pièce jointe générée à la volée.
 - Tests : en-têtes (`getFrom()`, `getTo()`, `getSubject()`), `getTextBody()` / `getHtmlBody()`, nombre de pièces jointes, type MIME du corps (`getBody()` est multipart de quel sous-type ?).
 - Bonus : `MimeTypes::getDefault()->guessMimeType()` sur un petit fichier PNG/texte temporaire ; `getExtensions('image/png')`.
@@ -99,3 +103,34 @@ Créer un événement métier et trois listeners de priorités 20, 0 et -10 sur 
 Concevoir un service de rapport qui sélectionne les fichiers via Finder, date le résultat avec Clock, publie via Filesystem et déclenche un événement métier après réussite. Un Process optionnel vérifie un outil externe ; Mime peut préparer une notification sans l'envoyer.
 
 Livrables : fixtures temporaires, tests d'un service appelé comme par une commande, trace d'événements et tableau des exceptions choisies. Acceptation : liste triée exacte, horodatage déterministe, aucune notification de succès après erreur d'écriture ou timeout, un seul événement après publication, dossier temporaire propre après test. Justifier les limites de l'atomicité d'un seul fichier et de la mémoire du processus. Indice final : isoler chaque frontière et prouver son échec avant d'assembler le service.
+
+## 13. Distinguer recherche et instantané de noms — intermédiaire
+
+Durée indicative : 35–50 min. Prérequis : exercices 5–6 et [parcours Finder](approfondissement.md).
+Scénario : un service annonce les noms des documents `.txt` d'un dossier d'import temporaire.
+Créer `a.txt` contenant `A`, `b.txt` contenant `B` et `ignore.csv` contenant `C` ; configurer le Finder avant d'ajouter `c.txt` contenant `C`.
+Le service doit pouvoir produire un tableau de noms relatifs triés, sans conserver un Finder partagé entre ses appels.
+
+- Réussite : première itération après création de `c.txt` → `['a.txt', 'b.txt', 'c.txt']` ; mémoriser ce tableau, puis créer `d.txt`.
+- Réussite : le tableau mémorisé reste inchangé ; un nouvel appel réel au service retourne les quatre noms `.txt`, jamais `ignore.csv`.
+- Cas négatif : racine inexistante → `DirectoryNotFoundException`, pas un tableau vide ; un fichier supprimé après relevé ne doit pas être présenté comme un contenu déjà capturé.
+- Diagnostic : montrer qu'une seconde variable affectée au même Finder partage ses critères ; expliquer pourquoi le service reconstruit sa recherche.
+- Preuve : `KernelTestCase` appelant le service, fixtures créées sous un dossier temporaire et nettoyage garanti après chaque cas.
+- Indice 1 : configurer un itérateur et le matérialiser sont deux moments distincts.
+- Indice 2 : comparer tableau de chaînes, tableau de `SplFileInfo` et nouvel appel à `getIterator()` ; seuls les noms déjà copiés sont figés ici.
+
+## 14. Lire un protocole de sortie sans dépendre des fragments — avancé
+
+Durée indicative : 55–75 min. Prérequis : exercice 11, buffers et [flux Process](approfondissement.md).
+Scénario : un service lance un enfant PHP connu qui lit sur stdin les identifiants `R-1` et `R-2`, puis écrit une ligne JSON par identifiant sur stdout.
+Fixer la sortie nominale à `{"id":"R-1","ok":true}\n{"id":"R-2","ok":true}\n`, stderr à `diagnostic\n` et code final à 0.
+Passer les données à `setInput()` et utiliser `PHP_BINARY` avec un tableau d'arguments ; aucun shell ni serveur externe.
+Le service ne publie sa liste qu'après fin réussie et validation de toutes les lignes.
+
+- Réussite : appel réel au service → deux résultats dans l'ordre `R-1`, `R-2`, valeurs `ok` booléennes, diagnostic conservé séparément.
+- Robustesse : l'enfant écrit successivement des demi-lignes ; le résultat est identique, sans imposer le nombre ni la taille des callbacks Process.
+- Cas négatif A : dernière ligne tronquée, code 0 → erreur de protocole et aucune publication partielle.
+- Cas négatif B : deux lignes valides, code 7 → échec d'exécution et aucune publication ; ne pas déduire le succès de la seule validité JSON.
+- Preuve : tests de service avec trois programmes enfants déterministes, timeout court mais non chronométré et buffers réinitialisés entre appels.
+- Indice 1 : un callback livre un fragment d'octets, pas nécessairement une ligne métier.
+- Indice 2 : séparer buffer stdout incomplet, résultats provisoires, stderr et décision finale sur le code ; le reliquat final fait partie du protocole.

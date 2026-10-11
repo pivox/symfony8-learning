@@ -1,5 +1,7 @@
 # Exercices — Module 01
 
+[Cours](README.md) · [Approfondissement](approfondissement.md) · [Exercices](exercices.md) · [Quiz](quiz.md)
+
 Code dans `src/Php84/`, tests dans `tests/Php84/` (`php bin/phpunit tests/Php84`). Écris le test d'abord.
 
 ## 1. Property hooks
@@ -76,3 +78,47 @@ Deux traits exposent `label()` avec des résultats différents. Crée une classe
 ## Défi final — mini-domaine de commande
 
 Compose quantité, statut et politique de transition dans un service sans base de données. Scénario : créer une commande, payer, refuser une annulation après paiement, puis chercher la première commande au-dessus d'un seuil avec le service existant. Attendu : état inchangé après échec, aucun résultat → `null`, trace d'échec unique et aucun effet partagé entre deux commandes. Livre les tests, les sorties PHPUnit et cinq lignes justifiant types, enum, exception et immutabilité. Pas de correction complète à produire.
+
+## 12. Import paresseux avec arrêt anticipé
+
+**Niveau : intermédiaire · Durée : 40–55 min · Prérequis : exercice 10 et [générateurs](approfondissement.md).**
+
+Un écran ne veut afficher que les deux premiers codes d'un import potentiellement coûteux. Créer un service produisant un nouveau générateur à chaque appel et une trace indiquant chaque code effectivement produit.
+
+Données : codes `A-10`, `B-20`, `C-30`, dans cet ordre. La variante d'échec remplace le troisième code par une donnée invalide qui doit lever `UnexpectedValueException` lorsqu'elle est atteinte.
+
+Critères de réussite, par appels réels au service depuis les tests :
+
+- Créer le générateur ne remplit pas la trace ; demander le premier élément ajoute seulement `A-10`.
+- Consommer deux éléments puis arrêter produit `A-10`, `B-20`, sans production du troisième.
+- Deux appels indépendants au service permettent deux parcours complets, avec les mêmes valeurs dans le même ordre.
+- Le parcours complet de la variante invalide lève l'exception après les deux valeurs valides ; sa simple création ne la lève pas.
+- Cas négatif : tenter un nouveau parcours du même générateur déjà terminé ne fournit pas magiquement trois nouveaux éléments. Relever l'échec PHP et le distinguer d'une nouvelle invocation du service.
+
+Livrable : tests, trace de production et trois phrases expliquant à quel moment les calculs et l'erreur surviennent. Ne pas transformer immédiatement le générateur en tableau dans le scénario d'arrêt anticipé.
+
+**Indice 1 :** distinguer « obtenir un objet Generator » et « demander une valeur à cet objet ».
+
+**Indice 2 :** une méthode contenant `yield` reporte aussi l'exécution des instructions avant le premier `yield` ; si une validation doit être immédiate, réfléchir à la frontière entre méthode publique et producteur interne.
+
+## 13. Brouillon indépendant et instantané immutable
+
+**Niveau : intermédiaire · Durée : 45–60 min · Prérequis : exercice 8, `readonly`, section copie de l'[approfondissement](approfondissement.md).**
+
+Un devis peut être dupliqué pour préparer une nouvelle offre. Créer un brouillon mutable contenant une date mutable et une ligne mutable, puis une opération explicite de duplication qui isole les données modifiables. Ajouter un instantané `readonly` représentant les valeurs confirmées, avec une date immutable.
+
+Données : référence `D-07`, date `2026-02-10 12:00:00 UTC`, ligne `carnet`, quantité `2`, prix unitaire `350` centimes. Dans la copie seulement, passer à quantité `5` et avancer la date de deux jours.
+
+Critères de réussite :
+
+- Un appel à la duplication produit une instance distincte ; modifier sa ligne et sa date laisse l'original à quantité 2 et au 10 février.
+- Deux duplications sont indépendantes entre elles ; l'instantané conserve un total de 700 centimes même si le brouillon évolue ensuite.
+- L'instantané expose une `DateTimeImmutable` et aucune API ne permet de réaffecter sa quantité ; une tentative d'écriture externe échoue.
+- Cas négatif : quantité 0 refusée, sans modifier la dernière valeur valide ni un instantané déjà créé.
+- Une expérience séparée avec un simple clonage superficiel met en évidence le partage initial de l'objet ligne ; elle ne doit pas remplacer le test de l'opération finale.
+
+Livrable : tests appelant les opérations du brouillon, avec assertions sur les valeurs après mutation et sur les identités utiles. Pas de sérialisation JSON comme raccourci de copie profonde.
+
+**Indice 1 :** comparer uniquement les références des deux brouillons ne dit rien de leurs propriétés contenant d'autres objets.
+
+**Indice 2 :** décider pour chaque donnée si elle doit être recopiée, partagée ou transformée en valeur immutable ; `__clone()` et un constructeur d'instantané répondent à des besoins différents.

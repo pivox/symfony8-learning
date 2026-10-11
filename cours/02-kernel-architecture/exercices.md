@@ -1,5 +1,7 @@
 # Exercices — Module 02
 
+[Cours](README.md) · [Approfondissement](approfondissement.md) · [Exercices](exercices.md) · [Quiz](quiz.md)
+
 Code dans `src/Architecture/` (namespace `App\Architecture`), tests dans `tests/Architecture/` (namespace `App\Tests\Architecture`) : `php bin/phpunit tests/Architecture`. Écris le test d'abord.
 
 ## 1. Observer avant de coder
@@ -80,3 +82,47 @@ Ajoute un service qui lit le chemin courant via `RequestStack` au moment de chaq
 ## Défi final — incident reproductible
 
 Compose maintenance, réponse normale, fragment et exception métier dans quatre routes de diagnostic. Pour chaque route, fournis statut, traces ordonnées, nombre d'appels de contrôleur et état final de la pile. Attendu : 503 en maintenance sans contrôleur, 200 normal, fragment identifié comme secondaire, exception métier convertie en 409, aucune contamination après une cinquième requête normale. Joins les commandes de diagnostic et explique où interviendrait `terminate`, sans ajouter de tâche asynchrone réelle.
+
+## 13. Résolveur ciblé : absence et refus explicite
+
+**Niveau : avancé · Durée : 50–65 min · Prérequis : exercice 6 et [résolution ciblée](approfondissement.md).**
+
+Une page de tarif reçoit une devise via un résolveur ciblé `lesson.currency`. Seul le paramètre marqué doit l'utiliser. Créer un value object `Currency` et deux routes : `/lesson/resolver/quote/{code}` et `/lesson/resolver/optional`, cette dernière acceptant `?Currency $currency = null`.
+
+Données : `EUR` et `USD` sont les seuls codes autorisés. Le code `ZZZ` existe syntaxiquement mais n'est pas pris en charge. L'absence de code est permise uniquement sur la route optionnelle.
+
+Critères de réussite par requêtes HTTP :
+
+- `GET /lesson/resolver/quote/EUR` → 200 avec le code `EUR`, contrôleur appelé une fois.
+- La route optionnelle sans attribut `code` → 200 avec une indication explicite « aucune devise » ; le résolveur a laissé la valeur par défaut jouer.
+- Cas négatif : `GET /lesson/resolver/quote/ZZZ` → 404 et zéro appel métier ; ne pas convertir ce refus en `null`.
+- Une troisième route recevant seulement `Request` fonctionne sans invocation de ce résolveur ciblé.
+- Le diagnostic retrouve le service sous `controller.targeted_value_resolver` ; le test vérifie le comportement réel, pas seulement le tag.
+
+Livrable : matrice route/entrée/résultat/compteur et explication de la différence entre `[]`, `[null]` et exception.
+
+**Indice 1 :** le même type PHP dans deux signatures ne suffit pas à exprimer qu'elles souhaitent la même source HTTP.
+
+**Indice 2 :** examiner la liste de secours construite dans `ArgumentResolver` lorsqu'un résolveur est ciblé ; lever le refus lorsque l'entrée est présente mais invalide.
+
+## 14. Export streamé : chronologie et échec tardif
+
+**Niveau : avancé · Durée : 55–75 min · Prérequis : exercices 9 et 11, [réponse différée](approfondissement.md).**
+
+Créer `/lesson/stream/report` qui retourne une `StreamedResponse` et trace les moments du contrôleur, de `kernel.response`, de `kernel.finish_request` et du callback. Le flux contient exactement `code\nA-10\nB-20\n`, sans temporisation.
+
+Pour séparer les phases, utiliser le Kernel directement dans un `KernelTestCase`, puis capturer `sendContent()` avec un tampon de sortie nettoyé en `finally`. La pile de départ est vide ; conserver le `RequestStack` de ce Kernel.
+
+Critères de réussite :
+
+- Après `handle()`, aucune ligne du callback n'a été produite ; les événements de réponse et de fin ont été tracés.
+- Pendant `sendContent()`, le callback voit `/lesson/stream/report` dans la pile ; après envoi, la pile est de nouveau vide.
+- La sortie capturée correspond exactement aux octets annoncés ; rappeler `sendContent()` sur la même réponse n'en produit aucun de plus.
+- Cas négatif : une variante contrôlée émet `code\n`, puis lève `RuntimeException('export interrompu')` ; l'exception remonte de l'envoi, le préfixe est capturé et la pile est nettoyée.
+- Cette erreur tardive n'ajoute pas un passage dans le `catch` ordinaire de `handle()` ni une seconde exécution du contrôleur.
+
+Livrable : deux chronologies séparant création et envoi, octets capturés et état de pile. Ne pas exiger un remplacement rétroactif du flux par une page JSON complète.
+
+**Indice 1 :** `getContent()` n'exécute pas le callback d'une réponse streamée.
+
+**Indice 2 :** lire l'enveloppe de callback installée dans le `finally` de `HttpKernel::handle()` ; sa propre clause `finally` reste active lorsque le producteur échoue.

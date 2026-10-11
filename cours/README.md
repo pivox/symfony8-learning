@@ -2,9 +2,11 @@
 
 Un parcours personnel pour comprendre les mécanismes, les observer dans l’application, puis les mettre en pratique. Les supports sont en français ; les exercices sont à réaliser par l’apprenant. Les indices orientent la recherche sans fournir les solutions complètes.
 
+[Méthode et diagnostic](methode-et-diagnostic.md) · [Ateliers transversaux](ateliers/README.md)
+
 ## Versions et périmètre
 
-État inspecté le **3 octobre 2026** : PHP **8.4.1**, Symfony **8.1.8**, PHPUnit **13.3.6**. Les versions exactes viennent de `composer.lock` et de `php bin/console about` ; `composer.json` demande PHP ≥ 8.4 et les composants Symfony 8.1.*.
+État inspecté le **11 octobre 2026** : PHP **8.4.1**, Symfony **8.1.8**, PHPUnit **13.3.6**. Les versions exactes viennent de `composer.lock` et de `php bin/console about` ; `composer.json` demande PHP ≥ 8.4 et les composants Symfony 8.1.*.
 
 La **certification Symfony 8 porte sur Symfony 8.0**, pas sur les ajouts 8.1. Chaque module distingue son socle des compléments récents. Les quiz sont des questions originales d’entraînement, pas des questions officielles. Une fonctionnalité observée dans `vendor/` 8.1 n’est pas automatiquement au programme 8.0. [Programme officiel](https://certification.symfony.com/exams/symfony.html).
 
@@ -13,10 +15,13 @@ Les ESI restent un complément pratique au module 05. Doctrine, Workflow et Lock
 ## Structure d’un module
 
 - `README.md` : objectifs, prérequis, mécanismes, exemples courts, pièges, observation et références.
+- `approfondissement.md` : mécanismes complémentaires, cas limites, observations et documentation officielle versionnée.
 - `exercices.md` : progression guidée → autonome → diagnostic → défi, avec résultats attendus et indices.
 - `quiz.md` : questions à faire sans documentation, puis réponses expliquées en bas du fichier.
 
 Le code vit dans `src/<Module>/`, les tests dans `tests/<Module>/`. Les namespaces et chemins propres à chaque module sont précisés dans ses exercices. Les exemples des cours expliquent une API ; ils ne constituent pas les solutions des exercices.
+
+L’enrichissement du 11 octobre ajoute **19 approfondissements**, **38 exercices** et **quatre ateliers transversaux**. Les deux nouveaux exercices de chaque module se trouvent après les exercices existants et gardent la suite de leur numérotation. Les quiz et les défis précédents restent utilisables indépendamment.
 
 ## Modules et suivi personnel
 
@@ -47,6 +52,36 @@ Le code vit dans `src/<Module>/`, les tests dans `tests/<Module>/`. Les namespac
 Les cases de lecture sont non renseignées, pas une affirmation que le cours n’a pas été lu. Note le score du quiz sous la forme `bonnes réponses / total`, avec sa date, seulement après l’avoir passé.
 
 Lors de la prise de connaissance initiale : **11 tests passants, 19 assertions**. Ce résultat historique est à revérifier après chaque modification du code. Les réalisations PHP 8.4 ne couvrent pas encore toutes les consignes ; pour le Kernel, les tests portent sur une route absente et `catch: false`. Les nouveaux supports ne marquent aucun exercice supplémentaire comme réalisé.
+
+Au début de l’enrichissement du **11 octobre 2026**, les réalisations locales présentes donnent **20 tests passants, 40 assertions**. Les réponses sous `src/` et `tests/` sont volontairement ignorées par Git : ces chiffres décrivent cette copie de travail, pas la promesse qu’un nouveau clone contient ces tests. Ils ne cochent pas les nouveaux exercices.
+
+## Approfondir un sujet
+
+Lire le cours principal avant son complément. Les exercices supplémentaires peuvent être pratiqués séparément du défi final antérieur ; leurs prérequis et durées sont indiqués dans les énoncés.
+
+| Module | Complément | Mise en pratique |
+|---|---|---|
+| 01 — PHP et PSR | [Approfondissement](01-php84-psr/approfondissement.md) | [Exercices](01-php84-psr/exercices.md) |
+| 02 — Kernel | [Approfondissement](02-kernel-architecture/approfondissement.md) | [Exercices](02-kernel-architecture/exercices.md) |
+| 03 — Injection de dépendances | [Approfondissement](03-dependency-injection/approfondissement.md) | [Exercices](03-dependency-injection/exercices.md) |
+| 04 — HTTP | [Approfondissement](04-http-rfc9110/approfondissement.md) | [Exercices](04-http-rfc9110/exercices.md) |
+| 05 — Cache HTTP | [Approfondissement](05-cache-http/approfondissement.md) | [Exercices](05-cache-http/exercices.md) |
+| 06 — Security | [Approfondissement](06-security/approfondissement.md) | [Exercices](06-security/exercices.md) |
+| 07 — Serializer | [Approfondissement](07-serializer/approfondissement.md) | [Exercices](07-serializer/exercices.md) |
+| 08 — Messenger | [Approfondissement](08-messenger/approfondissement.md) | [Exercices](08-messenger/exercices.md) |
+| 09 — Twig et Forms | [Approfondissement](09-twig-forms/approfondissement.md) | [Exercices](09-twig-forms/exercices.md) |
+| 10 — Composants | [Approfondissement](10-composants/approfondissement.md) | [Exercices](10-composants/exercices.md) |
+| 11 — Routing | [Approfondissement](11-routing/approfondissement.md) | [Exercices](11-routing/exercices.md) |
+| 12 — Validator | [Approfondissement](12-validator/approfondissement.md) | [Exercices](12-validator/exercices.md) |
+| 13 — Console | [Approfondissement](13-console/approfondissement.md) | [Exercices](13-console/exercices.md) |
+| 14 — Tests | [Approfondissement](14-tests-diagnostic/approfondissement.md) | [Exercices](14-tests-diagnostic/exercices.md) |
+| 15 — HttpClient | [Approfondissement](15-http-client/approfondissement.md) | [Exercices](15-http-client/exercices.md) |
+| 16 — Cache applicatif | [Approfondissement](16-cache-applicatif/approfondissement.md) | [Exercices](16-cache-applicatif/exercices.md) |
+| 17 — Configuration | [Approfondissement](17-configuration/approfondissement.md) | [Exercices](17-configuration/exercices.md) |
+| 18 — Translation | [Approfondissement](18-translation/approfondissement.md) | [Exercices](18-translation/exercices.md) |
+| 19 — Mailer | [Approfondissement](19-mailer/approfondissement.md) | [Exercices](19-mailer/exercices.md) |
+
+Après quelques modules, choisir un [atelier transversal](ateliers/README.md) pour relier les mécanismes. La [fiche méthode et diagnostic](methode-et-diagnostic.md) propose une séance type, une matrice de preuves et un modèle de compte rendu d’incident.
 
 ## Ordre conseillé
 
@@ -82,6 +117,7 @@ Les tests fonctionnent déjà avec PHPUnit, BrowserKit et CssSelector. `symfony/
 | Besoin | Préparation lors de l’exercice |
 |---|---|
 | Profiler / barre de debug (module 14) | `composer require --dev symfony/profiler-pack` |
+| Composition d'adresses email avec Mime (module 10) | `composer require egulias/email-validator` ; également fourni par l'installation de Mailer |
 | Traduction (module 18) | `composer require symfony/translation` |
 | Envoi d’emails simulé (module 19) | `composer require symfony/mailer`, puis transport nul dans le laboratoire |
 | API PSR-16 pratique facultative (module 16) | `composer require psr/simple-cache` |

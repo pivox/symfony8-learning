@@ -1,5 +1,7 @@
 # Exercices — Module 06
 
+[Cours](README.md) · [Approfondissement](approfondissement.md) · [Exercices](exercices.md) · [Quiz](quiz.md)
+
 Code dans `src/Security/` (namespace `App\Security`), tests dans `tests/Security/` (namespace `App\Tests\Security`) : `php bin/phpunit tests/Security`. Écris le test d'abord. Les voters se testent en **unitaire** (pas besoin du kernel) ; les firewalls/`access_control` en `WebTestCase` avec `$client->loginUser()`.
 
 Pas de Doctrine installé : utilise un provider `memory` ou un provider custom en mémoire.
@@ -94,3 +96,48 @@ Avec un provider custom de test, préparer deux versions d'un utilisateur : avan
 Assembler connexion, profil, publication avec voter d'auteur et logout. Prévoir un article public et un privé, auteur et lecteur distincts. Aucun stockage Doctrine requis : fixtures et dépendances de test suffisent.
 
 Livrables : matrice HTTP (anonyme, mauvais credentials, lecteur, auteur, admin), tests du cycle réel connexion → action → sortie → refus, et une courte trace des événements. Acceptation : aucune publication refusée n'appelle le service métier, lecture publique autorisée, édition uniquement pour auteur/admin, CSRF invalide sans effet, aucun secret dans les réponses. Justifier les différences 302/401/403/404 sans fournir un statut interchangeable. Indice final : partir d'une route et d'un droit, puis élargir la matrice ; ne pas tout tester uniquement au niveau du voter.
+
+## 12. Compte désactivé malgré un mot de passe correct
+
+**Niveau : intermédiaire · Durée : 50–65 min · Prérequis : exercices 9–10 et [user checker](approfondissement.md).**
+
+Dans le parcours de formulaire existant, ajouter un `UserCheckerInterface` sélectionné par le firewall. Deux utilisateurs fixture partagent le rôle `ROLE_USER` : `alice@example.test` active et `bruno@example.test` désactivé. Leur mot de passe de démonstration est `atelier-42`, hashé avec le service Symfony lors de la préparation des fixtures.
+
+Le provider custom charge un champ `enabled` sans base de données. Chaque tentative utilise un client neuf, un vrai formulaire et, si activé, un token CSRF valide obtenu par ce client. Un collecteur de test distingue précontrôle, postcontrôle et succès final ; l'action protégée compte ses appels.
+
+Critères de réussite :
+
+- Alice avec le bon mot de passe : connexion réussie, puis profil 200 avec le même client ; précontrôle et postcontrôle observés avant `LoginSuccessEvent`.
+- Bruno avec le bon mot de passe : refus par le checker ; aucun `LoginSuccessEvent`, aucun accès métier, puis profil redirigé vers la connexion avec le même client.
+- Cas négatif : Alice avec `incorrect` échoue aussi, mais le postcontrôle et le succès final ne sont pas observés. Distinguer cet échec de celui d'état du compte.
+- Pour le refus de Bruno, vérifier qu'une exception d'état de compte adaptée a été utilisée, sans exposer de détails administratifs dans la page publique.
+- Le checker fonctionne avec la signature Symfony 8 de `checkPostAuth()` ; son seul enregistrement comme service ne suffit pas sans `user_checker` sur le firewall.
+
+Livrable : trois traces, réponses après redirection et compteur d'effet. Prévoir un collecteur observable malgré le redémarrage du Kernel de BrowserKit, ou relever son état après chaque requête ; ne pas perdre la preuve entre les appels.
+
+**Indice 1 :** les credentials et le statut administratif du compte sont deux vérifications séparées.
+
+**Indice 2 :** comparer `UserCheckerListener` et les événements `AuthenticationSuccessEvent`/`LoginSuccessEvent` ; le premier peut encore déboucher sur un refus.
+
+## 13. Remplacer le transport custom par `access_token`
+
+**Niveau : avancé · Durée : 55–75 min · Prérequis : exercice 3 et [authenticator natif](approfondissement.md).**
+
+Créer un firewall d'atelier limité à `^/lesson/token`, placé avant le firewall général, avec `stateless: true`, le mécanisme natif `access_token` et un handler applicatif. Utiliser seulement l'extracteur Bearer par défaut, un provider en mémoire et un entry point explicite renvoyant 401 avec challenge Bearer.
+
+Données de démonstration, sans valeur réelle : `lesson-reader` identifie `reader@example.test` avec `ROLE_USER` ; `lesson-editor` identifie `editor@example.test` avec `ROLE_USER` et `ROLE_EDITOR`. Tout autre token, notamment `lesson-revoked`, est refusé. `/lesson/token/profile` exige `ROLE_USER`, `/lesson/token/publish` exige `ROLE_EDITOR`.
+
+Critères de réussite par véritables requêtes HTTP, sans `loginUser()` :
+
+- `Authorization: Bearer lesson-reader` sur le profil → 200 avec l'identifiant attendu ; `lesson-editor` sur publication → 200 et un effet métier.
+- Token absent → 401 par l'entry point ; token inconnu ou révoqué → 401 par l'échec d'authentification. Les réponses portent un challenge `WWW-Authenticate` de schéma Bearer.
+- Cas négatif d'autorisation : token lecteur sur publication → 403, sans effet métier ; il ne devient pas un échec de validation du token.
+- Un appel valide suivi d'un appel sans header, avec le même client, redonne 401 : aucune authentification n'est récupérée de la session.
+- Fournir seulement `?access_token=lesson-editor` ne donne aucun accès, puisque cet extracteur n'a pas été activé.
+- Aucun token brut n'apparaît dans le corps des réponses ni dans les traces métier ; les fixtures ne servent qu'aux tests locaux.
+
+Livrable : matrice HTTP, diagnostic du firewall sélectionné et comparaison des responsabilités avec l'authenticator custom de l'exercice 3. Le handler vérifie le token ; les rôles et voters décident toujours des actions permises.
+
+**Indice 1 :** l'extraction HTTP est déjà fournie ; le contrat à implémenter côté application retourne un `UserBadge` après vérification.
+
+**Indice 2 :** un authenticator non applicable ne fabrique pas automatiquement la réponse à l'anonyme refusé ; vérifier séparément entry point, handler d'échec et ordre des firewalls.

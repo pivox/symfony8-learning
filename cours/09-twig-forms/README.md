@@ -1,5 +1,7 @@
 # Module 09 — Twig & Forms
 
+[Parcours](../README.md) · [Exercices](exercices.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md)
+
 ## Objectifs, prérequis et repères
 
 > Application : **Symfony 8.1.8, PHP ≥ 8.4**. La [certification Symfony](https://certification.symfony.com/exams/symfony.html) cible **8.0** : les mentions **8.1 uniquement** sont des compléments pour cette application, pas des acquis à attribuer à 8.0.

@@ -1,6 +1,6 @@
 # Exercices — Module 11 : mini-catalogue multilingue
 
-[Parcours](../README.md) · [Cours](README.md) · [Quiz](quiz.md)
+[Parcours](../README.md) · [Cours](README.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md)
 
 Code : `src/Routing/`, tests : `tests/Routing/`. Routes en attributs, contrôleurs `AbstractController`, service catalogue en mémoire.
 Choix du scénario : interface HTTP publique JSON, aucun stockage ni authentification. Les liens sont générés par le routeur.
@@ -87,3 +87,33 @@ Travail autonome : harmoniser noms de routes, représentation JSON et service de
 - Frontière : query additionnelle conservée comme query, jamais utilisée comme autorisation ; aucun URL construit manuellement.
 - Diagnostic final : expliquer un échec de génération distinct d'un échec de reconnaissance avec leurs exceptions/statuts.
 - Indice : assembler les comportements des exercices précédents ; un test de parcours protège leur cohérence.
+
+## 9. Un même nom dans le chemin et la query — intermédiaire
+
+Durée indicative : 35–50 min. Prérequis : génération, requête HTTP et [parties d'une URL](approfondissement.md).
+Scénario : `GET /lab/editions/{slug}` identifie l'édition affichée ; la query `slug` indique une édition à comparer.
+Créer la route nommée `lab_edition_show` en attribut, avec réponse JSON exposant séparément `pathSlug` et `querySlug`.
+Dans un service de liens, générer une URL avec chemin `php`, query `slug = symfony`, query `q = 'a & b'` et fragment `comparison`.
+
+- Réussite : chemin généré `/lab/editions/php`, query décodée contenant `slug = symfony` et `q = 'a & b'`, fragment exact `comparison`.
+- Réussite HTTP : appeler chemin + query → 200, `pathSlug = php`, `querySlug = symfony` ; aucun fragment n'est nécessaire dans l'appel serveur.
+- Cas négatif : transmettre une chaîne au lieu d'un tableau pour `_query` → exception de génération vérifiée ; route inconnue → `RouteNotFoundException` dans un test séparé.
+- Comparaison : fournir `q = ignored` comme paramètre supplémentaire et `q = 'a & b'` dans `_query`, puis constater la priorité de la query explicite.
+- Preuve : appel au générateur réellement injecté, puis requête `WebTestCase` sur l'URL générée sans fragment ; aucun `urlencode()` préalable.
+- Indice 1 : les attributs et la query de `Request` sont deux sacs distincts même lorsque les noms de clés coïncident.
+- Indice 2 : `_query` permet de conserver un nom déjà consommé par le chemin ; `_fragment` appartient au navigateur.
+
+## 10. Reconnaître la réponse avant une redirection — avancé
+
+Durée indicative : 45–60 min. Prérequis : méthodes HTTP et [HEAD et canonicalisation](approfondissement.md).
+Scénario : une action de diagnostic publique est déclarée exactement sur `/lab/canonical-report`, avec méthodes GET et POST.
+Elle renvoie le texte fixe `report-ready` et l'en-tête `X-Report-Version: 1` ; aucun effet métier ni stockage.
+Tester séparément GET, HEAD, POST et le chemin avec slash final, sans suivre automatiquement les redirections.
+
+- Réussite : GET canonique → 200, corps exact et header ; HEAD canonique → 200, même header et corps vide.
+- Réussite : POST canonique → 200 ; GET `/lab/canonical-report/?mode=short` → 301 vers la forme sans slash, query `mode=short` conservée.
+- Réussite : suivre explicitement cette redirection → 200 avec `report-ready` ; vérifier d'abord la réponse 301 pour ne pas la masquer.
+- Cas négatif : POST avec slash final → 404, sans redirection ; DELETE sur le chemin canonique → 405 avec GET et POST dans `Allow`.
+- Diagnostic : expliquer pourquoi un `UrlMatcher` autonome et le routeur HTTP du framework ne prouvent pas les mêmes comportements de redirection.
+- Indice 1 : HEAD est reconnu avec GET, puis le corps de réponse est supprimé au niveau HTTP.
+- Indice 2 : lire la condition sur GET/HEAD dans le matcher redirigeant ; tester les statuts avec `KernelBrowser`, pas seulement `router:match`.

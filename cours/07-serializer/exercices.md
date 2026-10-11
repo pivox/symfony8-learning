@@ -1,5 +1,7 @@
 # Exercices — Module 07
 
+[Parcours](../README.md) · [Cours](README.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md)
+
 Code dans `src/Serializer/` (namespace `App\Serializer`), tests dans `tests/Serializer/` (namespace `App\Tests\Serializer`) : `php bin/phpunit tests/Serializer`. Écris le test d'abord. Pour un serializer **sans** kernel, assemble-le à la main (`new Serializer([normalizers], [encoders])`) ; pour tester la config d'app, `KernelTestCase` + `getContainer()->get('serializer')`.
 
 ## 1. Aller-retour JSON
@@ -90,3 +92,32 @@ Exposer une route d'inscription avec `#[MapRequestPayload]` et répondre avec un
 Concevoir un contrat d'import avec destinataire et adresse imbriquée, rejeter les champs inattendus, puis produire une réponse publique. Choisir et documenter le comportement lorsqu'un élément de collection échoue ; aucun traitement partiel implicite.
 
 Livrables : tableau entrée → étape en échec → exception/statut, tests de service et HTTP, exemple de réponse réussie et refusée. Acceptation : types et imbrication conservés, valeurs métier validées, chemins d'erreurs exploitables, zéro secret exposé, zéro appel métier lorsque l'import est refusé. Indice final : vérifier séparément décodage, dénormalisation et validation avant d'assembler la route.
+
+## 12. Forme JSON d'un profil incomplet — intermédiaire
+
+Durée indicative : 35–45 min. Prérequis : exercices 1–2 et [états absents](approfondissement.md).
+Scénario : un client distingue une note inconnue, une liste vide et un objet de préférences vide.
+Créer une fixture `ProfileOutput` avec `note = null`, `tags = []`, un objet `preferences` sans attribut exposé et une propriété typée `alias` non initialisée, uniquement pour l'expérience.
+Appeler réellement `serialize()` du conteneur dans `KernelTestCase` ; produire trois sorties avec contextes différents.
+
+- Réussite : contexte ordinaire → `note` présente à `null`, `tags` vaut `[]`, `alias` absent ; contexte omettant les nulls → `note` absente.
+- Réussite : avec préservation des objets vides, `preferences` est `{}` et `tags` reste `[]` ; comparer les types JSON, pas seulement deux tableaux PHP associatifs.
+- Cas négatif : désactiver l'omission des propriétés non initialisées et constater la classe d'exception effective ; la propriété ne doit pas devenir silencieusement une chaîne vide.
+- Preuve : tableau contexte → clés présentes → forme de `preferences` et `tags`, plus assertions sur le service réellement appelé.
+- Indice 1 : absence, `null` et tableau vide sont trois états différents ; `isset()` ne distingue pas les deux premiers.
+- Indice 2 : examiner `SKIP_UNINITIALIZED_VALUES`, `SKIP_NULL_VALUES` et `PRESERVE_EMPTY_OBJECTS` dans `AbstractObjectNormalizer`.
+
+## 13. Modifier une fiche sans perdre son adresse — avancé
+
+Durée indicative : 45–60 min. Prérequis : sous-objets typés, exercice 10 et [mise à jour d'objet](approfondissement.md).
+Scénario : une fiche mutable contient `name = 'Ada'`, `note = 'porte B'` et une adresse mutable `city = 'Lyon'`, `postalCode = '69001'`.
+Ces deux objets sont des modèles d'expérience modifiables ; conserver les DTO d'entrée `readonly` dans le reste du parcours.
+Appliquer via le Serializer une première entrée `{"name":"Lin"}`, puis, sur une fixture neuve, `{"address":{"city":"Nantes"}}`.
+Donner aux champs de l'adresse des défauts explicites pour pouvoir comparer remplacement et réutilisation sans erreur de constructeur.
+
+- Réussite : mise à jour racine → instance racine identique, nom `Lin`, note inchangée et adresse inchangée.
+- Réussite : sans mise à jour profonde, le sous-objet reçu remplace l'adresse ; avec elle, même instance d'adresse, ville `Nantes` et code postal `69001` conservé.
+- Cas négatif : `{"name":"Lin","address":{"city":[]}}` échoue sur le type ; relever l'état de la racine après l'échec et démontrer qu'aucun traitement métier ultérieur n'est appelé.
+- Livraison : expliquer pourquoi la dénormalisation dans un objet existant ne garantit pas une opération atomique, puis proposer en prose la frontière d'un DTO d'entrée distinct.
+- Indice 1 : conserver les références de la racine et de l'adresse avant l'appel ; comparer `===` en plus des valeurs.
+- Indice 2 : combiner `OBJECT_TO_POPULATE` et, seulement pour la variante concernée, `DEEP_OBJECT_TO_POPULATE` ; ne pas extrapoler ce dernier aux collections.

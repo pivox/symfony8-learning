@@ -1,5 +1,7 @@
 # Module 10 — Composants : Clock, PropertyAccess, Finder, Filesystem, Mime, Process
 
+[Parcours](../README.md) · [Exercices](exercices.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md)
+
 ## Objectifs, prérequis et repères
 
 > Application : **Symfony 8.1.8, PHP ≥ 8.4**. La [certification Symfony](https://certification.symfony.com/exams/symfony.html) cible **8.0** : les mentions **8.1 uniquement** sont des compléments pour cette application, pas des acquis à attribuer à 8.0.
@@ -125,6 +127,8 @@ $fs->tempnam('/tmp', 'prefix_');  $fs->symlink(...);  $fs->chmod(...)
 ## 5. Mime
 
 > `symfony/mime` sert aussi de base à Mailer (`composer require symfony/mailer` pour envoyer).
+
+**Préparation de l'exercice email :** Mime est installé, mais `egulias/email-validator` ne l'est pas dans le socle actuel. `Mime\Address` exige cette bibliothèque dès sa construction. Pour travailler uniquement la composition MIME, lancer `composer require egulias/email-validator` au moment de pratiquer ; l'installation de `symfony/mailer` au module 19 l'apporte également. Aucun transport d'envoi n'est nécessaire pour inspecter un email. Cette dépendance ne concerne pas les exercices Clock, Finder ou Process.
 
 ```php
 $email = (new Email())

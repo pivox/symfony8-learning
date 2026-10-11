@@ -1,5 +1,7 @@
 # Exercices — Module 03
 
+[Cours](README.md) · [Approfondissement](approfondissement.md) · [Exercices](exercices.md) · [Quiz](quiz.md)
+
 Code dans `src/Di/` (namespace `App\Di`), tests dans `tests/Di/` (namespace `App\Tests\Di`) : `php bin/phpunit tests/Di`. Écris le test d'abord. Scénario fil rouge : un petit système de **notification** (`Notifier`) avec plusieurs canaux (`ChannelInterface` : email, sms, slack...).
 
 ## 1. Observer le container
@@ -84,3 +86,47 @@ Reproduis `Notifier → Channel → Notifier` dans un container isolé. Propose 
 ## Défi final — notification explicable
 
 Livre un `Notifier` avec canal par défaut, sélection explicite par clé, liste ordonnée de canaux et un canal décoré. Tous les canaux sont simulés. Attendu : canal inconnu refusé, zéro envoi externe, choix exact en environnement test, ordre vérifié et aucun cycle. Documente cinq diagnostics (alias, tag, arguments, décoration, compilation) et justifie chaque dépendance. Les tests doivent appeler le service, pas seulement inspecter les attributs.
+
+## 13. Pourquoi le buffer non partagé conserve-t-il une ancienne ligne ?
+
+**Niveau : intermédiaire · Durée : 40–55 min · Prérequis : exercice 11 et [durée de vie des services](approfondissement.md).**
+
+Un `PreviewBuilder` partagé reçoit au constructeur un `DraftBuffer` non partagé. Le buffer possède `append()` et `lines()` ; le builder ajoute une ligne puis retourne le contenu courant. Reproduire ce montage pédagogique avant de choisir une amélioration.
+
+Données : premier appel avec `alpha`, second avec `beta`. Ajouter un second consommateur `OtherPreviewBuilder` qui reçoit la même définition non partagée.
+
+Critères de réussite dans un `KernelTestCase` :
+
+- Deux appels au premier builder rendent d'abord `['alpha']`, puis `['alpha', 'beta']` dans le montage initial ; expliquer pourquoi cela respecte `shared: false`.
+- Un appel au second consommateur avec `gamma` donne seulement `['gamma']` ; ses données sont indépendantes.
+- Identifier l'instance conservée par chaque consommateur avec une observation de test, sans rendre toutes les définitions publiques.
+- Cas négatif : une ligne vide est refusée par le buffer et ne change pas `['alpha', 'beta']`.
+- Après refonte du contrat en « un aperçu indépendant par appel », les mêmes appels rendent `['alpha']`, puis `['beta']`. Le comportement final ne dépend pas d'un redémarrage du Kernel entre les deux appels.
+
+Livrable : preuve du comportement initial, tests du contrat final et court schéma des instances créées. Les consommateurs et le buffer restent simulés, sans fichier ni réseau.
+
+**Indice 1 :** compter les constructions des consommateurs avant de compter leurs appels métier.
+
+**Indice 2 :** un constructeur ne réinjecte pas ses arguments à chaque méthode ; choisir le début de l'opération comme point de création de l'objet de travail.
+
+## 14. Closure de service : résolution tardive et partage
+
+**Niveau : avancé · Durée : 45–60 min · Prérequis : exercice 7, exercice 13 et section closures de l'[approfondissement](approfondissement.md).**
+
+Un `BatchPreview` ne prépare un export qu'à la demande. Il reçoit une closure via `AutowireServiceClosure` vers un `BatchDraft`. La construction du brouillon incrémente un compteur de test remis à zéro pour chaque expérience.
+
+Données : deux lots `L-01` contenant `['a', 'b']` et `L-02` contenant `['c']`. Le brouillon refuse tout code de lot vide avant d'ajouter une ligne.
+
+Critères de réussite :
+
+- Récupérer `BatchPreview` dans le container ne construit aucun `BatchDraft` ; lire une méthode de diagnostic sans appeler la closure laisse le compteur à 0.
+- Avec un brouillon partagé dans un montage isolé, deux appels de closure retrouvent la même instance et le compteur vaut 1.
+- Dans la version finale non partagée, les deux exports construisent deux brouillons ; résultats exacts `L-01: a,b` et `L-02: c`, sans mélange des lignes.
+- Les appels sont faits au même service consommateur, dans le même Kernel ; aucune réinitialisation cachée entre les lots.
+- Cas négatif : exporter un code vide est refusé et ne modifie pas le résultat déjà produit ; l'appel suivant avec `L-02` reste correct.
+
+Livrable : tests de service, tableau nombre de résolutions/nombre de constructions et sortie `lint:container --env=test`. Pour la variante partagée, utiliser un container isolé afin de ne pas casser le montage final.
+
+**Indice 1 :** différer une demande de service et demander une nouvelle instance sont deux décisions séparées.
+
+**Indice 2 :** regarder la définition `shared` du service retourné par la closure ; ne pas mémoriser son résultat dans le consommateur si le contrat exige un nouveau brouillon par opération.

@@ -1,5 +1,7 @@
 # Exercices — Module 09
 
+[Parcours](../README.md) · [Cours](README.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md)
+
 Code dans `src/TwigForms/` (namespace `App\TwigForms`), templates de test dans `templates/twig_forms/` (ou chargés via `ArrayLoader` dans les tests), tests dans `tests/TwigForms/` (namespace `App\Tests\TwigForms`) : `php bin/phpunit tests/TwigForms`. Écris le test d'abord.
 
 ## Partie Twig
@@ -100,3 +102,33 @@ Créer une extension de `TextType` apportant `help_icon: null|string`, la transf
 Assembler formulaire, validation, transformer, upload et page récapitulative Twig. Utiliser un service de test pour enregistrer les appels et un dossier temporaire ; aucune couche Doctrine n'est imposée.
 
 Livrables : tests de rendu et de type, plus le scénario HTTP complet. Acceptation : erreurs visibles au bon champ, saisie conservée après échec, aucune action métier si CSRF/conversion/validation échoue, fichier traité seulement après succès, redirection puis récapitulatif échappé. Inclure un titre ressemblant à du HTML et un nom de fichier trompeur dans les fixtures. Indice final : d'abord le cycle GET/POST minimal, ensuite transformer et fichier ; garder séparés le diagnostic interne et les messages destinés au visiteur.
+
+## 13. Une modification partielle qui conserve les autres champs — intermédiaire
+
+Durée indicative : 40–55 min. Prérequis : exercices 5 et 10, [soumission partielle](approfondissement.md).
+Scénario : une fiche modifiable possède `nickname = 'Ada'`, `city = 'Lyon'` et `internalCode = 'R-17'`.
+Définir un FormType avec les deux premiers champs modifiables et `internalCode` désactivé ; le surnom est obligatoire.
+Tester des appels réels à `submit()` via `form.factory` du conteneur, dans `KernelTestCase`.
+Pour ces tests de mécanique Form sans HTTP, désactiver explicitement CSRF à la création ; garder les tests CSRF de l'exercice 10 séparés.
+
+- Réussite : soumettre seulement `nickname = 'Lin'` avec `clearMissing: false` → surnom `Lin`, ville `Lyon`, champ ville non soumis.
+- Réussite : envoyer aussi `internalCode = 'PIRATE'` → valeur `R-17` conservée, sans fausse modification du modèle.
+- Cas négatif : surnom présent mais vide → formulaire invalide et aucun appel métier ; champ inconnu `isAdmin = '1'` → données supplémentaires refusées.
+- Comparaison : sur une fixture et un Form neufs, employer `clearMissing: true`, puis expliquer la valeur finale de `city` avec l'option `empty_data` choisie.
+- Indice 1 : présence d'une clé et valeur vide ne conduisent pas au même état de soumission de l'enfant.
+- Indice 2 : examiner `get('city')->isSubmitted()`, `getExtraData()` et les données mappées ; ne pas se limiter à `isValid()`.
+
+## 14. Une erreur métier au bon endroit dans le HTML — avancé
+
+Durée indicative : 50–70 min. Prérequis : contraintes de classe, thèmes, exercice 10 et [mapping des erreurs](approfondissement.md).
+Scénario : une réservation sans persistence propose les dates `2026-11-03` et `2026-11-04` ; une politique locale refuse la première.
+Le validateur produit une violation au chemin métier `availability`, tandis que le champ visible se nomme `requestedDate`.
+Relier cette violation au champ avec les options Form, puis exposer le formulaire sur `GET|POST /lab/reservation/check`.
+Sur succès, retourner la page de confirmation avec 200 ; sur formulaire invalide, rendre le Form et obtenir 422.
+
+- Réussite : GET → formulaire et token ; même client, date `2026-11-04` → 200 et exactement un appel au service de confirmation.
+- Cas négatif : date `2026-11-03` avec token valide → 422, aucun appel de confirmation, saisie conservée et une seule erreur près de `requestedDate`.
+- Preuve : vérifier origine de `FormError` au niveau service et emplacement du message dans le DOM au niveau HTTP ; la racine ne doit pas dupliquer ce message.
+- Cas de rendu : afficher une note fictive `<b>complet</b>` à côté du champ comme texte, sans élément `b` injecté.
+- Indice 1 : le chemin de validation métier et le nom du champ visible peuvent différer sans renommer la propriété métier.
+- Indice 2 : comparer `error_mapping`, `error_bubbling` et les blocs `form_errors` rendus ; aucun `raw` n'est nécessaire.

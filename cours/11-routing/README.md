@@ -1,6 +1,6 @@
 # Module 11 — Routing : reconnaître et générer les URL
 
-[Parcours](../README.md) · [Exercices](exercices.md) · [Quiz](quiz.md)
+[Parcours](../README.md) · [Exercices](exercices.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md)
 
 ## Objectifs et prérequis
 

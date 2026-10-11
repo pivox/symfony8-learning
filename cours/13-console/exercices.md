@@ -1,6 +1,6 @@
 # Exercices — Module 13 : import simulé et rapport d'erreurs
 
-[Parcours](../README.md) · [Cours](README.md) · [Quiz](quiz.md)
+[Parcours](../README.md) · [Cours](README.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md)
 
 Code : `src/Console/`, tests : `tests/Console/`, exécution : `php bin/phpunit tests/Console`.
 Le CSV possède l'en-tête `email,name`. L'import produit un résultat en mémoire ; aucune persistance ni notification réelle.
@@ -87,3 +87,38 @@ Travail autonome : réunir aide, service, options, rapport, statuts et diagnosti
 - Couvrir : limite incohérente, fichier absent, en-tête incorrect, CSV cité, refus interactif, exécution non interactive et listener applicatif.
 - Livraison : tests reproductibles sans réseau ni base, fichiers temporaires nettoyés et aide permettant à un tiers de lancer la commande.
 - Indice : une commande fiable définit ensemble son entrée, sa sortie et son statut ; aucun de ces trois éléments ne suffit seul.
+
+## 9. Autonome — proposer un format sans déclencher l'import
+
+**Niveau :** intermédiaire · **Durée indicative :** 40 minutes.
+**Prérequis :** exercices 1, 2 et 4 ; [complétion Console](approfondissement.md).
+
+Scénario : une personne découvre `--format` avec la complétion, mais chaque pression sur Tab ne doit pas relire le CSV.
+Ajoute à `app:contacts:inspect` l'option `--format`, défaut `text`, suggestions `text` et `json`.
+Le mode texte conserve la synthèse existante ; le mode JSON prépare le contrat machine de l'exercice suivant.
+La validation à l'exécution doit refuser toute autre valeur, même saisie sans utiliser la complétion.
+Utilise une fixture d'une ligne valide `ada@example.test,Ada`, précédée de l'en-tête habituel.
+
+- **Critères :** avec `CommandCompletionTester`, compléter la valeur vide de `--format` retourne exactement les deux suggestions, comparées sans imposer leur ordre.
+- **Critères :** une complétion avec un chemin CSV inexistant ne lance aucune analyse et ne crée aucun rapport ; le compteur du service reste à zéro.
+- **Appel réel :** `CommandTester::execute()` avec `--format=text` et la fixture retourne 0 et la synthèse 1/1/0.
+- **Cas négatif :** `--format=xml` retourne 2 et un diagnostic explicite avant tout appel au service ; proposer des valeurs n'a donc pas suffi à valider l'entrée.
+- **Indice 1 :** les suggestions appartiennent à la définition de l'option ; la décision d'accepter une valeur appartient à l'exécution.
+- **Indice 2 :** le tester dédié attend des jetons d'entrée, avec un dernier élément vide pour la valeur à compléter ; récupère la commande depuis l'application du kernel de test.
+
+## 10. Défi — vérifier le contrat depuis un processus PHP
+
+**Niveau :** avancé · **Durée indicative :** 50 minutes.
+**Prérequis :** exercices 5 et 9 ; composant Process déjà installé.
+
+Scénario : un job externe consomme `app:contacts:inspect --format=json` et doit pouvoir lire stdout comme un document unique.
+Dans un répertoire temporaire, crée `contacts essai.csv` avec l'en-tête `email,name` et la seule donnée `ada@example.test,Ada`.
+En mode JSON, réserve stdout au rapport `read`, `accepted`, `rejected`, `errors` ; adresse les diagnostics à stderr.
+Lance le véritable `bin/console` avec Process, un tableau d'arguments, `--env=test` et `--no-interaction`.
+
+- **Critères :** statut 0, stdout désérialisable en un document JSON avec compteurs 1/1/0 et aucune erreur ; stderr vide ; le chemin contenant un espace est transmis intact.
+- **Critères :** sur la fixture mixte initiale, le rapport reste lisible, le statut vaut 1 et l'erreur vise la ligne 3 ; aucun titre décoré ne précède le JSON.
+- **Cas négatif :** un chemin inexistant produit statut 1, stdout vide et un diagnostic sur stderr mentionnant ce chemin ; aucun rapport résiduel n'est créé.
+- **Livrable :** un test de sous-processus et une note expliquant pourquoi un double posé dans le conteneur PHPUnit ne serait pas présent dans cet autre processus.
+- **Indice 1 :** distingue argument Process, parsing Console et sérialisation du rapport : chacun a sa propre frontière.
+- **Indice 2 :** `run()`, `getOutput()` et `getErrorOutput()` permettent d'inspecter un échec attendu sans demander à `mustRun()` de le convertir en exception.

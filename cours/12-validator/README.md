@@ -1,6 +1,6 @@
 # Module 12 — Validator : règles, contextes et chemins d'erreur
 
-[Parcours](../README.md) · [Exercices](exercices.md) · [Quiz](quiz.md)
+[Parcours](../README.md) · [Exercices](exercices.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md)
 
 ## Objectifs et prérequis
 

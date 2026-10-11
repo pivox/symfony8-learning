@@ -1,5 +1,7 @@
 # Exercices — Module 04
 
+[Cours](README.md) · [Approfondissement](approfondissement.md) · [Exercices](exercices.md) · [Quiz](quiz.md)
+
 Code dans `src/Http/` (namespace `App\Http`), tests dans `tests/Http/` (namespace `App\Tests\Http`) : `php bin/phpunit tests/Http`. Écris le test d'abord. Fil rouge : une mini-API d'« articles » (`/articles`).
 
 ## 1. Méthodes et sémantique
@@ -83,3 +85,47 @@ Une route propose HTML et JSON ; stabilise ses erreurs JSON en champs publics `c
 ## Défi final — parcours d'articles et pièces jointes
 
 Sans Doctrine, utilise des fixtures et un service en mémoire contrôlé par les tests. Crée un article valide, observe 201/Location, affiche sa représentation négociée, associe une pièce jointe, puis la télécharge en GET et HEAD. Couvre séparément 400, 404, 405 avec Allow, 406, 415 et 422 ; un flash de confirmation ne doit apparaître qu'une fois. Précise comment l'état du scénario est conservé entre requêtes de test, sans supposer qu'un Kernel redémarré conserve un tableau en mémoire.
+
+## 13. Reprendre un téléchargement sans mélanger les versions
+
+**Niveau : intermédiaire · Durée : 40–55 min · Prérequis : exercice 11 et [plages HTTP](approfondissement.md).**
+
+Une route `/lesson/download/archive` sert un fichier régulier de dix octets, exactement `abcdefghij`, avec `BinaryFileResponse` et un ETag fort `archive-v3`. Le fichier est une fixture temporaire hors `public/`, créée et supprimée par le test.
+
+Critères de réussite par requêtes HTTP et capture réelle du corps :
+
+- GET sans condition → 200 et dix octets ; `Range: bytes=2-5` → 206, corps `cdef`, `Content-Length: 4`, `Content-Range: bytes 2-5/10`.
+- `Range: bytes=-3` → 206 et `hij` ; aucune interprétation de caractères multioctets n'entre dans ce jeu ASCII.
+- Même plage avec `If-Range: "archive-v3"` → 206 ; avec `If-Range: "archive-v2"` → 200 et fichier complet.
+- Cas négatif : `Range: bytes=20-30` → 416 avec `Content-Range: bytes */10`, sans octets du fichier.
+- HEAD → aucun corps, et une seconde requête GET normale retourne toujours les dix octets ; chaque appel utilise une réponse neuve.
+
+Livrable : tableau requête/statut/en-têtes/taille/corps. Ne pas écrire de parseur de Range : vérifier le comportement du composant et limiter l'exercice à ces plages uniques.
+
+**Indice 1 :** la préparation d'une réponse fichier dépend de la requête, et ses bornes de plage sont inclusives.
+
+**Indice 2 :** inspecter `BinaryFileResponse::prepare()` et `hasValidIfRangeHeader()` ; un validateur If-Range différent conduit à ignorer la plage, pas à renvoyer 304.
+
+## 14. Retrouver l'origine publique derrière un proxy
+
+**Niveau : avancé · Durée : 45–60 min · Prérequis : objets Request, tests de service et [proxies de confiance](approfondissement.md).**
+
+Créer un service `RequestOriginInspector` qui reçoit une `Request` lors de son appel et retourne protocole, hôte et adresse client à partir des méthodes HttpFoundation. Il doit fonctionner sans conserver la requête entre deux appels.
+
+Données déterministes : URI interne `http://app.internal/lesson/origin`, `REMOTE_ADDR=192.0.2.10`, `X-Forwarded-Proto=https`, `X-Forwarded-For=198.51.100.23`, `X-Forwarded-Host=public.example`. Ces adresses sont des fixtures de documentation.
+
+Critères de réussite dans des tests de service appelant réellement les méthodes de `Request` :
+
+- Sans proxy approuvé : protocole `http`, hôte `app.internal`, IP `192.0.2.10`.
+- En approuvant seulement ce proxy et les catégories FOR/PROTO : protocole `https`, IP `198.51.100.23`, hôte toujours `app.internal`.
+- En autorisant aussi la catégorie HOST : hôte `public.example` ; justifier ce changement de confiance.
+- Cas négatif : avec `REMOTE_ADDR=203.0.113.9` non approuvée et les mêmes en-têtes, le protocole reste `http` et les informations transmises ne deviennent pas fiables.
+- Avec `trusted_hosts` limité à `public.example`, une requête effectivement évaluée avec un autre host est refusée par HttpFoundation. Distinguer l'exception de composant du 400 produit dans un cycle HTTP complet.
+
+Isoler chaque test de service `KernelTestCase` avec les attributs PHPUnit `RunInSeparateProcess` et `PreserveGlobalState(false)`. Démarrer le kernel et récupérer le service d'abord, puis définir explicitement proxies, catégories d'en-têtes et hosts avant de construire la requête. Ne pas redémarrer le kernel après ce réglage : il réappliquerait sa configuration. Aucun réglage réel du serveur n'est modifié.
+
+Livrable : matrice des quatre origines calculées et tests de refus. Utiliser les API Symfony ; lire directement `X-Forwarded-For` dans le service contournerait le mécanisme étudié.
+
+**Indice 1 :** l'adresse de l'émetteur et les catégories d'en-têtes sont deux paramètres indépendants.
+
+**Indice 2 :** ces réglages sont statiques, mais leurs getters ne sont pas tous symétriques : `getTrustedHosts()` renvoie des expressions déjà délimitées, que `setTrustedHosts()` délimiterait à nouveau. L'isolation de processus évite cette restauration incorrecte ; si tu restaures manuellement des hosts, conserve les motifs bruts d'origine.

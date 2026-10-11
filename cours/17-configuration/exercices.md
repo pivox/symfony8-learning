@@ -1,6 +1,6 @@
 # Exercices — Module 17
 
-[Cours](README.md) · [Quiz](quiz.md) · [Méthode](../README.md)
+[Cours](README.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md) · [Méthode](../README.md)
 
 Code éventuel dans `src/Configuration/`, tests dans `tests/Configuration/`. Utilise exclusivement des variables fictives préfixées `TUTO_`. Les laboratoires Dotenv utilisent un répertoire temporaire et restaurent `$_ENV` et `$_SERVER` ; aucune modification de vrais secrets.
 
@@ -60,3 +60,37 @@ Dans une copie jetable, introduis successivement une valeur obligatoire absente,
 - **Critères :** trois erreurs distinguées et corrigées ; tests existants exécutés en test ; container et cache préparés en prod ; une route d'exercice connue donne la réponse attendue. Aucune dépendance n'est mise à jour avec `composer update`.
 - **Livrable :** tableau « symptôme → preuve → correction → vérification » sans secrets.
 - **Indice :** une erreur de syntaxe, de résolution de service et de comportement HTTP n'apparaît pas nécessairement au même stade.
+
+## 9. Autonome — décoder une liste avec un repli explicite
+
+**Niveau :** intermédiaire · **Durée indicative :** 45 minutes.
+**Prérequis :** exercice 4 ; [composition des processeurs](approfondissement.md).
+
+Scénario : `LocalePolicy::allowed(): array` consomme une variable fictive `TUTO_LOCALES` au format JSON.
+Le paramètre de repli `tuto.default_locales` contient la chaîne JSON `["fr","en"]`.
+La politique n'accepte qu'une liste non vide de chaînes uniques parmi `fr` et `en`, et conserve l'ordre déclaré.
+Injecte la valeur avec `Autowire` et les processeurs adaptés ; chaque cas de test utilise un kernel neuf et restaure les variables modifiées.
+
+- **Critères :** variable absente ou chaîne vide → `['fr', 'en']` ; valeur `["en"]` → `['en']` ; résultat obtenu par un appel au service du conteneur.
+- **Critères :** `["en","fr"]` conserve cet ordre ; le repli est choisi avant le décodage JSON.
+- **Cas négatif :** `["fr",` déclenche une erreur de conversion ; `[]`, `["fr","fr"]`, `[42]` et `["de"]` déclenchent chacun un refus métier ; aucune de ces valeurs présentes ne devient silencieusement le repli.
+- **Livrable :** tests à jeux nommés distinguant absence, conversion et règle métier ; aucune modification des vrais fichiers locaux d'environnement.
+- **Indice 1 :** un paramètre de repli peut être une chaîne JSON avant conversion ; ne lui attribue pas prématurément le type du résultat final.
+- **Indice 2 :** lis la chaîne de processeurs de droite à gauche et vérifie séparément décodage, `array_is_list()`, types et ensemble de valeurs autorisées.
+
+## 10. Diagnostic — une variable change, deux services gardent l'ancienne valeur
+
+**Niveau :** avancé · **Durée indicative :** 50 minutes.
+**Prérequis :** services partagés, `KernelTestCase`, [résolution différée](approfondissement.md).
+
+Scénario : deux services distincts `FirstWindow` et `SecondWindow` consomment exactement `int:TUTO_WINDOW` et exposent chacun `size(): int`.
+Définis la variable fictive à `10` dans `$_ENV` et `$_SERVER`, démarre le kernel, puis résous uniquement `FirstWindow`.
+Change ensuite les deux valeurs à `20` sans redémarrer le kernel et résous `SecondWindow` pour la première fois.
+Assure-toi que les deux services sont conservés et accessibles dans le conteneur de test, sans ajouter de dépendance entre eux.
+
+- **Critères :** le premier appel à `FirstWindow::size()` retourne 10 ; après modification, les deux services du même conteneur retournent encore 10.
+- **Critères :** après `ensureKernelShutdown()` puis un nouveau `bootKernel()` avec la variable toujours à 20, les deux services nouvellement récupérés retournent 20.
+- **Cas négatif :** l'hypothèse « un service créé après la modification reçoit forcément 20 » doit être réfutée par le deuxième service ; ne le résous pas avant la modification.
+- **Livrable :** preuve par appels réels, explication du cache de résolution du conteneur, puis restauration de la présence et de la valeur initiales dans les deux tableaux, même en cas d'échec.
+- **Indice 1 :** distingue l'argument déjà stocké dans un objet et la valeur mémorisée pour une expression d'environnement.
+- **Indice 2 :** lis `Container::getEnv()` et `envCache` ; un nouveau kernel doit fournir de nouvelles instances, sans réutiliser les références PHP aux anciens services.

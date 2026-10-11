@@ -1,6 +1,6 @@
 # Exercices — Module 18
 
-[Cours](README.md) · [Quiz](quiz.md) · [Méthode](../README.md)
+[Cours](README.md) · [Approfondissement](approfondissement.md) · [Quiz](quiz.md) · [Méthode](../README.md)
 
 Installer Translation selon le cours avant de commencer. Code dans `src/Translation/`, tests dans `tests/Translation/`, catalogues dans `translations/`, templates dans `templates/translation/`. Utilise `KernelTestCase` pour le traducteur intégré et `WebTestCase` pour les pages.
 
@@ -60,3 +60,37 @@ Assemble titre, état vide, compteur ICU, lien de changement de langue et formul
 - **Critères :** parcours HTTP français puis anglais ; compteur pour 0 et 2 articles ; formulaire invalide traduit ; pas de fuite de langue entre requêtes et aucune clé brute parmi les messages requis.
 - **Livrable :** tests et tableau des domaines utilisés avec leur responsabilité.
 - **Indice :** teste aussi une langue après l'autre avec le client de test pour détecter les états conservés involontairement.
+
+## 9. Diagnostic — un texte identique à sa clé peut être traduit
+
+**Niveau :** intermédiaire · **Durée indicative :** 45 minutes.
+**Prérequis :** Translation installé via Composer/Flex, exercices 1 et 4, [inspection des catalogues](approfondissement.md).
+
+Scénario : un contrôle de qualité doit distinguer une traduction française rédigée, un repli anglais et une clé absente.
+Dans le domaine `audit`, définis `title: Contrôle` en français et `title: Check` en anglais ; définis `OK: OK` dans les deux langues.
+Définis `help: Ask for help` uniquement en anglais ; laisse `missing` absent partout et conserve `en` comme repli.
+Crée un service d'audit recevant les quatre identifiants dans l'ordre `title`, `OK`, `help`, `missing`.
+
+- **Critères :** un appel réel en français retourne les états `local`, `local`, `fallback`, `missing` dans cet ordre ; les textes associés sont `Contrôle`, `OK`, `Ask for help`, `missing`.
+- **Critères :** l'audit repose sur le catalogue réel du traducteur configuré ; `debug:translation fr --domain=audit` fournit un diagnostic cohérent.
+- **Cas négatif :** un algorithme qui compare seulement le texte traduit à l'identifiant classe à tort `OK` comme absent ; le test doit détecter cette confusion.
+- **Livrable :** `KernelTestCase` vérifiant états et textes ; domaine explicite dans chaque appel ; aucune modification de la locale globale nécessaire pour l'audit.
+- **Indice 1 :** la disponibilité par repli et la présence dans le catalogue demandé répondent à deux questions.
+- **Indice 2 :** compare `MessageCatalogueInterface::defines()` et `has()` ; pour l'inspection, vise `TranslatorBagInterface` et vérifie son câblage vers le service `translator`.
+
+## 10. Autonome — résoudre un message et son paramètre dans la même langue
+
+**Niveau :** intermédiaire · **Durée indicative :** 45 minutes.
+**Prérequis :** Translation installé, exercice 2 et [messages différés](approfondissement.md).
+
+Scénario : un service prépare une notification d'état avant de savoir si elle sera rendue en français ou en anglais.
+Dans le domaine `notifications`, définis `delivery.summary` par `Livraison %reference% : %state%` et `Delivery %reference%: %state%`.
+Définis `delivery.ready` par `prête` et `ready` dans ces mêmes catalogues.
+Prépare un `TranslatableMessage` extérieur pour la référence `R-42`, avec un autre message traduisible comme paramètre d'état.
+
+- **Critères :** le même message préparé, résolu successivement en `fr`, `en`, puis `fr`, donne `Livraison R-42 : prête`, `Delivery R-42: ready`, puis le premier texte identique.
+- **Critères :** l'objet préparé conserve l'identifiant et les paramètres ; aucun appel prématuré au traducteur n'est nécessaire lors de sa construction.
+- **Cas négatif :** avec une clé d'état volontairement absente `delivery.unknown`, le rendu révèle cette clé brute ; le test ne considère pas ce résultat comme une notification traduite valide.
+- **Livrable :** tests du service et appels au traducteur intégré avec locales explicites ; démontrer qu'un état traduit d'avance en français échouerait sur le cas anglais.
+- **Indice 1 :** reporte la traduction des valeurs qui sont elles-mêmes des messages ; la référence `R-42` reste une donnée ordinaire.
+- **Indice 2 :** `TranslatableMessage::trans()` résout les paramètres implémentant `TranslatableInterface` avec la locale transmise avant de traduire le message extérieur.

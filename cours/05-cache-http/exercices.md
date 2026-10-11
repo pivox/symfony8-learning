@@ -1,5 +1,7 @@
 # Exercices — Module 05
 
+[Cours](README.md) · [Approfondissement](approfondissement.md) · [Exercices](exercices.md) · [Quiz](quiz.md)
+
 Code dans `src/HttpCache/` (namespace `App\HttpCache`), tests dans `tests/HttpCache/` (namespace `App\Tests\HttpCache`) : `php bin/phpunit tests/HttpCache`. Écris le test d'abord. Pour les tests de contrôleurs, utilise `WebTestCase` (+ `$client->request(...)`).
 
 ## 1. Expiration pure
@@ -83,3 +85,47 @@ Utilise des doubles ou les outils de connexion du client de test pour deux utili
 ## Défi final — catalogue public et compte privé
 
 Compose catalogue multilingue, article versionné et page de compte. Livre une matrice route/utilisateur/langue/headers/statut/hit ou miss/appels d'origine. Attendu : fraîcheur et variantes correctes, 304 sans rendu, 200 après changement de version, aucune fuite entre utilisateurs. Un test de contrôleur vérifie les en-têtes ; un autre avec `HttpCache` prouve le stockage réel. ESI reste une extension facultative hors certification, sans être nécessaire à la réussite du défi.
+
+## 13. Revalidation sans nouveau rendu
+
+**Niveau : avancé · Durée : 50–65 min · Prérequis : exercices 3 et 7, [statuts entre origine et proxy](approfondissement.md).**
+
+Une route `/lesson/cache/stock` renvoie exactement `stock=12`, avec ETag `stock-v1` et politique `public, no-cache`. Construire un scénario passant réellement par une même instance de `HttpCache`, un store temporaire et une origine dont les appels et rendus sont comptés séparément.
+
+Les deux requêtes clientes sont des GET ordinaires sans validateur ni directive Cache-Control. L'origine traite ses conditions avant le rendu ; sa version reste `stock-v1` pendant le scénario.
+
+Critères de réussite :
+
+- Premier GET : réponse cliente 200 et corps `stock=12` ; un appel d'origine et un rendu.
+- Deuxième GET : la requête envoyée par le proxy à l'origine contient le validateur stocké ; l'origine renvoie 304 sans rendre le corps.
+- Le client reçoit néanmoins 200 et `stock=12` ; total deux appels d'origine, un seul rendu. Capturer les octets envoyés par le proxy si sa réponse utilise un fichier interne.
+- Dans une expérience séparée avec un store vide et `no-store`, deux GET causent deux appels d'origine et deux rendus ; aucune copie nouvellement stockée n'est réutilisée.
+- Cas négatif : en changeant la version à `stock-v2` et le corps à `stock=9` dans un état réellement partagé par l'origine de test, l'ancien validateur ne provoque plus 304 ; le client reçoit le nouveau corps.
+
+Livrable : trace des deux échanges HTTP, compteurs et nettoyage du store. Ne pas conclure « pas de cache » à partir du seul fait que l'origine a été appelée deux fois.
+
+**Indice 1 :** un proxy peut posséder le corps complet alors que son client ne le possède pas.
+
+**Indice 2 :** lire `HttpCache::validate()` : après un 304 d'origine, il met à jour l'entrée et peut renvoyer son corps stocké ; le statut du contrôleur n'est pas forcément le statut final.
+
+## 14. Modification du détail, liste encore fraîche
+
+**Niveau : avancé · Durée : 55–75 min · Prérequis : exercice 7 et [invalidation HTTP](approfondissement.md).**
+
+Une origine de test expose `GET /lesson/cache/items/7`, `PUT` sur cette même URI et `GET /lesson/cache/items`. Les deux lectures ont une fraîcheur publique de 600 secondes. Utiliser un dépôt fixture en mémoire détenu par l'origine de test, stable pendant tout le scénario, sans Doctrine.
+
+Données : titre initial `Carnet bleu`, version `1`. Le PUT valide remplace le titre par `Carnet vert`, version `2`, et répond 204 sans `Location` ni `Content-Location`. Le payload passe par un DTO mappé si l'origine est un contrôleur applicatif.
+
+Critères de réussite, toutes les requêtes passant par le même proxy :
+
+- Charger détail et liste puis les relire : un seul rendu d'origine par URI avant modification.
+- Après le PUT réussi, relire le détail renvoie `Carnet vert` et incrémente son compteur ; l'ancienne entrée fraîche n'est plus réutilisée telle quelle.
+- Relire la liste renvoie encore sa version stockée `Carnet bleu`, sans nouvel appel d'origine : documenter cette limite volontaire du scénario.
+- Cas négatif indépendant, avec fixtures et store réinitialisés : un PUT refusé en 409 ne modifie rien ; une lecture suivante du détail frais garde son contenu et n'ajoute aucun rendu d'origine.
+- Proposer une politique explicite pour la liste (par exemple expiration courte ou URL versionnée), avec justification de sa fenêtre de cohérence. Ne pas ajouter un faux en-tête Location uniquement pour forcer le résultat.
+
+Livrable : tableau versions/compteurs/statuts et explication de l'URI invalidée. Aucun test ne doit attendre 600 secondes ; l'objectif est justement d'observer l'entrée encore fraîche.
+
+**Indice 1 :** un proxy voit des URI et des réponses HTTP, pas les dépendances métier entre une fiche et toutes les listes possibles.
+
+**Indice 2 :** lire le chemin `invalidate()` pour les méthodes non sûres et sa condition de statut ; garder ensuite la lecture de la liste séparée de celle du détail.

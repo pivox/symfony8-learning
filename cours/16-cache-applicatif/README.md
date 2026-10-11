@@ -1,6 +1,6 @@
 # Module 16 — Cache applicatif
 
-[Parcours](../README.md) · [Exercices](exercices.md) · [Quiz](quiz.md)
+[Parcours](../README.md) · [Approfondissement](approfondissement.md) · [Exercices](exercices.md) · [Quiz](quiz.md)
 
 ## Objectifs et prérequis
 
